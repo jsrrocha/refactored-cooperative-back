@@ -1,12 +1,14 @@
 package com.challenge.cooperative.util;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import com.challenge.cooperative.model.dtos.AgendaDTO;
+import com.challenge.cooperative.model.dtos.VoteDTO;
 import com.challenge.cooperative.model.entities.Agenda;
 import com.challenge.cooperative.model.entities.Associate;
 import com.challenge.cooperative.model.entities.Vote;
@@ -15,9 +17,8 @@ import com.challenge.cooperative.service.AgendaService;
 import com.challenge.cooperative.service.AssociateService;
 import com.challenge.cooperative.service.SessionService;
 import com.challenge.cooperative.service.VotingService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-@Service
+@Component
 public class AgendaUtil {
 
 	@Autowired
@@ -31,6 +32,9 @@ public class AgendaUtil {
 	
 	@Autowired
 	private VotingService votingService; 
+	
+	@Autowired
+	private SessionUtil sessionUtil;
 	
 
 	public String validateAgendaDTO(AgendaDTO agendaDTO) {
@@ -56,9 +60,20 @@ public class AgendaUtil {
 		agendaDTO.setName(agenda.getName());
 		return agendaDTO;
 	} 
+	
+	public List<AgendaDTO> convertListToDTO(Iterable<Agenda> agendas){
+		List<AgendaDTO> agendasDTO = new ArrayList<AgendaDTO>();
+		agendas.forEach(agenda ->{
+			AgendaDTO agendaDTO = new AgendaDTO();
+			agendaDTO.setId(agenda.getId());
+			agendaDTO.setName(agenda.getName());
+			agendasDTO.add(agendaDTO);
+		});
+		return agendasDTO;
+	}
 
 	public String validateOpenSessionInput(Long id, Integer time) {
-		if (agendaService.isThereAgendaWithId(id)) {
+		if (!agendaService.isThereAgendaWithId(id)) {
 			return "Pauta não existe";
 		}
 	
@@ -67,29 +82,34 @@ public class AgendaUtil {
 		}
 
 		List<Map<String, String>> sessionAttributes = sessionService.findAllSessionAttributes();
-		boolean foundOpenSession = sessionService.isAgendaSessionOpen(sessionAttributes, id.toString());
+		boolean foundOpenSession = sessionUtil.isAgendaSessionOpen(sessionAttributes, id.toString());
 		if (foundOpenSession) {
 			return "Já existe uma votação aberta para essa pauta";
 		}
 		return null;
 	}
 
-	public String validateVotingInput(Long id, Map<String, Object> voteMap) {
-		if (voteMap.get("vote") == null) {
+	public String validateVote(VoteDTO voteDTO) {
+		if (voteDTO.getVote() == null) { 
 			return "Preencha o voto";
 		}
 
-		if (voteMap.get("associate") == null) {
+		if (voteDTO.getAssociateId() == null) {
 			return "Preencha o associado";
 		}
-
-		Associate associate = associateService.getAssociateById(Long.parseLong(voteMap.get("associate").toString()));
-		if (associate !=null) {
+		
+		if (voteDTO.getAgendaId() == null) {
+			return "Preencha a pauta";
+		}
+		
+		Associate associate = associateService
+				.getAssociateById(new Long(voteDTO.getAssociateId()));
+		if (associate == null) {
 			return "Associado não existe";
 		}
 		
-		Agenda agenda = agendaService.getAgendaById(id);
-		if (agenda != null) {
+		Agenda agenda = agendaService.getAgendaById(new Long(voteDTO.getAgendaId()));
+		if (agenda == null) {
 			return "Agenda não existe";
 		}
 		
@@ -98,29 +118,31 @@ public class AgendaUtil {
 			return "Não existe votação para essa pauta";
 		}
 
-		List<Map<String, String>> sessionAttributes = sessionService.findAllSessionAttributes();
-		boolean foundOpenSession = sessionService.isAgendaSessionOpen(sessionAttributes, id.toString());
+		List<Map<String, String>> sessionAttributes = sessionService
+				.findAllSessionAttributes();
+		boolean foundOpenSession = sessionUtil
+				.isAgendaSessionOpen(sessionAttributes, voteDTO.getAgendaId().toString());
 		if (!foundOpenSession) {
 			return "Não existe votação aberta para essa pauta";
 		}
 		
 		Voting voting = votingList.get(0); 
-		if (associateAlreadyVoted(id, associate, voting.getVotes())) {
+		if (associateAlreadyVoted(associate, voting.getVotes())) {
 			return "Associado já votou nessa pauta";
 		}
 
 		return null;
-	}
+	} 
 
-	public boolean associateAlreadyVoted(Long agendaId, Associate associate, List<Vote> votes) {
+	public boolean associateAlreadyVoted(Associate associate, List<Vote> votes) {
 		return votes.stream()
-				.filter(vote -> vote.getAssociate().equals(associate)).count() > 0;
+				.filter(vote -> vote.getAssociate().getId().equals(associate.getId())).count() > 0;
 	}
 
 	public String validateResultInput(Long id) {
 		
 		Agenda agenda = agendaService.getAgendaById(id);
-		if (agenda != null) {
+		if (agenda == null) {
 			return "Agenda não existe";
 		}
 		
@@ -130,7 +152,7 @@ public class AgendaUtil {
 		}
 		
 		List<Map<String, String>> sessionAttributes = sessionService.findAllSessionAttributes();
-		boolean foundOpenSession = sessionService
+		boolean foundOpenSession = sessionUtil
 				.isAgendaSessionOpen(sessionAttributes,votingList.get(0).getAgenda().getId().toString());
 		if (foundOpenSession) {
 			return "Votação para essa pauta ainda está aberta";
@@ -139,9 +161,11 @@ public class AgendaUtil {
 		return null;
 	} 
 
-	public String getResult(Long optionYes, Long optionNo) {
-		String result = "";
+	public String getResult(List<Vote> votes) {
+		Long optionYes = votes.stream().filter(vote-> vote.isVote() == true).count();
+        Long optionNo = votes.stream().filter(vote-> vote.isVote() == false).count(); 
 		
+        String result = "";
 		if (optionYes > optionNo) {
 			result = "Pauta aprovada";
 		} else if (optionYes < optionNo) {
@@ -153,11 +177,8 @@ public class AgendaUtil {
 		return result;
 	}
 
-	public Map<String, String> buildResponseMap(Long optionYes, Long optionNo, String result) {
-		
+	public Map<String, String> buildResponseMap(String result) {
 		Map<String, String> response = new HashMap<String, String>();
-		response.put("yesCount", optionYes.toString());
-		response.put("noCount", optionNo.toString());
 		response.put("result", result);
 
 		return response;

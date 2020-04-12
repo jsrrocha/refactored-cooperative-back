@@ -15,9 +15,7 @@ public class AssociateService {
 	@Autowired
 	private AssociateRepository associateRepository;
 
-	public Associate saveAssociate(String name) {
-		Associate associate = new Associate();
-		associate.setName(name);
+	public Associate saveAssociate(Associate associate) {
 		associateRepository.save(associate);
 		return associate;
 	}

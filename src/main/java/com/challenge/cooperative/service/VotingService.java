@@ -1,13 +1,16 @@
 package com.challenge.cooperative.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import com.challenge.cooperative.model.entities.Agenda;
 import com.challenge.cooperative.model.entities.Voting;
 import com.challenge.cooperative.repository.VotingRepository;
 
+@Service
 public class VotingService {
 	
 	@Autowired
@@ -23,6 +26,11 @@ public class VotingService {
 	
 	public List<Voting> getVotingByAgenda(Agenda agenda) {
 		return votingRepository.findByAgendaOrderByIdDesc(agenda);
+	}
+	
+	public Voting getVotingById(Long id) { 
+		Optional<Voting> optionalVoting = votingRepository.findById(id);
+		return optionalVoting.get();
 	}
 	
 	public boolean isThereVotingWithAgenda(Agenda agenda) {

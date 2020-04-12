@@ -9,8 +9,6 @@ import javax.persistence.Id;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 @Entity
 @Table(name = "Associate")
 public class Associate {
@@ -21,7 +19,6 @@ public class Associate {
 	private String name;
 	
 	@OneToMany(mappedBy = "associate")
-	@JsonIgnore
 	private List<Vote> votes; 
 
 	public Long getId() {

@@ -17,11 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.challenge.cooperative.model.dtos.AgendaDTO;
 import com.challenge.cooperative.model.dtos.VoteDTO;
 import com.challenge.cooperative.model.entities.Agenda;
-import com.challenge.cooperative.model.entities.Associate;
 import com.challenge.cooperative.model.entities.Vote;
 import com.challenge.cooperative.model.entities.Voting;
 import com.challenge.cooperative.service.AgendaService;
-import com.challenge.cooperative.service.AssociateService;
 import com.challenge.cooperative.service.VoteService;
 import com.challenge.cooperative.service.VotingService;
 import com.challenge.cooperative.util.AgendaUtil;
@@ -35,10 +33,7 @@ public class AgendaController {
 	private AgendaService agendaService;
 	
 	@Autowired
-	private AssociateService associateService; 
-	
-	@Autowired
-	private VotingService votingService;
+	private VotingService votingService; 
 	
 	@Autowired
 	private VoteService voteService;
@@ -61,23 +56,25 @@ public class AgendaController {
 			Agenda agenda =  agendaUtil.convertToEntity(agendaDTO);
 			agenda = agendaService.saveAgenda(agenda);
 			agendaDTO = agendaUtil.convertToDTO(agenda);
-			return new ResponseEntity<AgendaDTO>(agendaDTO,HttpStatus.OK);   
+			return new ResponseEntity<AgendaDTO>(agendaDTO,HttpStatus.CREATED);   
 		}catch (Exception e) {
 			e.printStackTrace();
-			return new ResponseEntity<String>(e.getMessage(), HttpStatus.BAD_REQUEST); 
+			return new ResponseEntity<String>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR); 
 		} 
 	}
 
 	@GetMapping("/")
-	public ResponseEntity<?> getAgendas(){
+	public ResponseEntity<?> getAllAgendas(){
 		try {
 			Iterable<Agenda> agendas = agendaService.getAllAgendas();
-			return new ResponseEntity<>(agendas, HttpStatus.OK);  
+			List<AgendaDTO> agendasDTO = agendaUtil.convertListToDTO(agendas);
+			
+			return new ResponseEntity<List<AgendaDTO>>(agendasDTO, HttpStatus.OK);  
 		}catch (Exception e) {
 			e.printStackTrace();
-			return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST); 
+			return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR); 
 		}
-	} 
+	}  
 
 	@Transactional 
 	@PostMapping("/{id}/voting/session/open/{time}")
@@ -94,32 +91,29 @@ public class AgendaController {
 			
 			sessionUtil.setSession(session, id.toString(), time);
 
-			return new ResponseEntity<>(HttpStatus.OK);
+			return new ResponseEntity<>(HttpStatus.CREATED);
 		}catch (Exception e) {
 			e.printStackTrace();
-			return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST); 
+			return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR); 
 		}
 	}
 
     @Transactional 
-	@PostMapping("/{id}/voting")
-	public ResponseEntity<?> AgendaVoting(@PathVariable Long id, @RequestBody VoteDTO voteDTO){
+	@PostMapping("/voting")
+	public ResponseEntity<?> AgendaVoting(@RequestBody VoteDTO voteDTO){
 		try {
-			String errorMessage = agendaUtil.validateVotingInput(id, voteDTO);
+			String errorMessage = agendaUtil.validateVote(voteDTO);
 			if(errorMessage != null) {
 				return new ResponseEntity<String>(errorMessage, HttpStatus.BAD_REQUEST); 
 			}
-			Agenda agenda = agendaService.getAgendaById(id);			
-			List<Voting> votingList = votingService.getVotingByAgenda(agenda);
 			
-			boolean option = voteMap.get("vote").toString().equals("Sim") ? true : false;
-			Associate associate = associateService.getAssociateById(Long.parseLong(voteMap.get("associate").toString()));
-			Vote vote = voteService.saveVote(option, associate, votingList.get(0));
+			Vote vote = voteService.convertToEntity(voteDTO);
+			vote = voteService.saveVote(vote);
 			
-			return new ResponseEntity<Vote>(vote,HttpStatus.OK);
+			return new ResponseEntity<>(HttpStatus.CREATED);
 		}catch (Exception e) {
 			e.printStackTrace();
-			return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST); 
+			return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR); 
 		}
 	}
   
@@ -127,7 +121,6 @@ public class AgendaController {
     @PostMapping("/{id}/voting/result") 
     public ResponseEntity<?> resultVotingAgenda(@PathVariable Long id){
     	try {
-    		
     		String errorMessage = agendaUtil.validateResultInput(id);
 			if(errorMessage != null) {
 				return new ResponseEntity<String>(errorMessage, HttpStatus.BAD_REQUEST); 
@@ -135,19 +128,14 @@ public class AgendaController {
 			
 			Agenda agenda = agendaService.getAgendaById(id);			
 			List<Voting> votingList = votingService.getVotingByAgenda(agenda);
-			
-    		List<Vote> votes = votingList.get(0).getVotes();
-            Long optionYes = votes.stream().filter(vote-> vote.isVote() == true).count();
-            Long optionNo = votes.stream().filter(vote-> vote.isVote() == false).count(); 
-
-            String result =  agendaUtil.getResult(optionYes, optionNo);
+		
+            String result =  agendaUtil.getResult(votingList.get(0).getVotes());
+    		Map<String,String> response = agendaUtil.buildResponseMap(result); 
     		
-    		Map<String,String> response = agendaUtil.buildResponseMap(optionYes, optionNo, result); 
 			return new ResponseEntity<Map<String,String>>(response,HttpStatus.OK);
-			
     	}catch (Exception e) {
     		e.printStackTrace();
-    		return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST); 
+    		return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR); 
     	}
     }
 }

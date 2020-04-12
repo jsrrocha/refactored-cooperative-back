@@ -44,15 +44,6 @@ public class SessionService {
 		}
 	}
 
-	public boolean isAgendaSessionOpen(List<Map<String, String>> sessionAttributes, String agendaId) {
-		boolean found = false;
-		if (sessionAttributes != null) {
-			found = sessionAttributes.stream()
-					.filter(sessionAttribute -> sessionAttribute.get("attribute").equals(agendaId)).count() > 0;
-		}
-		return found;
-	}
-
 	public Map<String, String> findSessionAttributeAgendaId(String agendaId)  {
 		Map<String, String> sessionAttributeMap = null;
 		
