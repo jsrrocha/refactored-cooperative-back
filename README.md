@@ -34,7 +34,8 @@ Substituir o {id} pelo id da pauta.
 
 
 A API foi hospedada em: 
-https://cooperative-sd.herokuapp.com/cooperative/
+https://new-cooperative.herokuapp.com/cooperative/
 
 É possível acessar a interface em: 
-https://cooperative-sd.netlify.com/
+
+https://new-cooperative.netlify.com
